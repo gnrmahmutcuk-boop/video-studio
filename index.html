@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reels Video Stüdyosu</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1c1c1c;--card:#f0ede5;--line:#d9d4c7;--acc:#d9531e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161a;--fg:#ececec;--card:#1f2228;--line:#343945;--acc:#ff7a3d}}
+:root[data-theme="dark"]{--bg:#14161a;--fg:#ececec;--card:#1f2228;--line:#343945;--acc:#ff7a3d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:14px;max-width:720px;margin-inline:auto}
+h1{font-size:20px;margin:4px 0 12px}
+canvas{display:block;margin:0 auto;width:min(100%,280px);aspect-ratio:9/16;border-radius:14px;background:#000}
+.bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-size:15px;font-weight:600}
+button.g{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+input,select,textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px}
+input[type=range]{padding:0}
+.sc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sc .w{grid-column:1/-1}
+.sc label{font-size:12px;opacity:.7;display:block;margin-bottom:2px}
+.hd{display:flex;justify-content:space-between;align-items:center;grid-column:1/-1;font-weight:700}
+video{display:block;margin:12px auto;width:min(100%,280px);border-radius:12px}
+small{opacity:.7}
+</style>
+</head>
+<body>
+<h1>🎬 Reels Video Stüdyosu</h1>
+<canvas id="cv" width="540" height="960"></canvas>
+<input type="range" id="seek" min="0" max="100" value="0" step="0.01" style="margin-top:10px">
+<div class="bar">
+  <button id="play">▶ Oynat</button>
+  <button id="rec">⏺ Kaydet</button>
+  <button class="g" id="add">+ Sahne</button>
+</div>
+<div id="out"></div>
+<div class="sc"><div class="w"><label>Üstteki yeşil etiket</label><input id="lab" value="EV ARKADAŞIM · BÖLÜM 1"></div></div>
+<div id="list"></div>
+<small>Kaydet'e basınca video baştan sona oynar ve WebM olarak kaydedilir.</small>
+
+<script>
+const W=540,H=960,cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const TH={day:['#eadcb9','#cdb78f'],night:['#1c2b4d','#0d1630'],dark:['#0b1220','#1b2338']};
+let scenes=[
+ {t:'YANLIŞ',s:'Yanlış.',h:'Yanlış',bg:'day',c:'orange',p:'suitcase',d:2.5},
+ {t:'KİRAYI YATIRDIM',s:'Kirayı yatırdım.',h:'yatırdım',bg:'day',c:'girl',p:'suitcase',d:3},
+ {t:'EV KURALLARI',s:'Üç: Eve misafir yok.',h:'misafir yok',bg:'day',c:'none',p:'note',d:3.5},
+ {t:'GECE 02.00',s:'Gece ikide mutfakta ses geldi.',h:'ses',bg:'night',c:'pajama',p:'none',d:3.5},
+ {t:'TELEFONUN TİTREDİ',s:'Tam o an telefonun titredi.',h:'titredi',bg:'dark',c:'none',p:'phone',d:3},
+ {t:'NE YAPACAKSIN?',s:'Sabah yedi.',h:'yedi',bg:'dark',c:'orange',p:'none',d:3}
+];
+let label='EV ARKADAŞIM · BÖLÜM 1',now=0,playing=false;
+const total=()=>scenes.reduce((a,s)=>a+(+s.d||1),0);
+
+function rr(x,y,w,h,r,f,s){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.strokeStyle=s;ctx.lineWidth=5;ctx.stroke()}}
+function outline(txt,x,y,fill,sw){ctx.lineJoin='round';ctx.lineWidth=sw||9;ctx.strokeStyle='#000';ctx.strokeText(txt,x,y);ctx.fillStyle=fill;ctx.fillText(txt,x,y)}
+function wrap(text,max){const ws=text.split(' '),lines=[];let cur=[];
+ for(const w of ws){const test=[...cur,w].join(' ');if(ctx.measureText(test).width>max&&cur.length){lines.push(cur);cur=[w]}else cur.push(w)}
+ if(cur.length)lines.push(cur);return lines}
+const norm=s=>s.toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]/gu,'');
+
+function person(kind,x,y,b,t){
+ const bob=Math.sin(t*5)*b;
+ const col={girl:'#2f5d3f',pajama:'#a999d6',orange:'#f08a1d'}[kind];
+ rr(x-42,y-170,34,170,8,kind==='pajama'?'#8f7fc4':'#3d5a80');rr(x+8,y-170,34,170,8,kind==='pajama'?'#8f7fc4':'#3d5a80');
+ rr(x-62,y-350+bob,124,190,18,col);
+ rr(x-86,y-340+bob,26,140,12,col);rr(x+60,y-340+bob,26,140,12,col);
+ ctx.beginPath();ctx.arc(x,y-405+bob,58,0,7);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=5;ctx.strokeStyle='#111';ctx.stroke();
+ if(kind!=='orange'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(x,y-410+bob,62,Math.PI,0);ctx.fill();ctx.fillRect(x-62,y-410+bob,16,70);ctx.fillRect(x+46,y-410+bob,16,70)}
+ ctx.fillStyle='#111';ctx.beginPath();ctx.arc(x-20,y-395+bob,5,0,7);ctx.arc(x+20,y-395+bob,5,0,7);ctx.fill()}
+
+function prop(p,x,y,t){
+ if(p==='suitcase'){rr(x+90,y-190,100,190,12,'#c4262e','#111');ctx.strokeStyle='#111';ctx.lineWidth=6;ctx.strokeRect(x+120,y-225,40,35)}
+ if(p==='phone'){rr(x-170,200,340,560,34,'#0b1330','#e8e8f0');ctx.fillStyle='#fff';ctx.font='800 72px system-ui';ctx.textAlign='center';ctx.fillText('02:07',x,430);ctx.font='600 26px system-ui';ctx.fillText('Bilinmeyen',x,490)}
+ if(p==='note'){ctx.save();ctx.translate(x,470);ctx.rotate(-.04);rr(-170,-200,340,400,10,'#f6f0df');ctx.fillStyle='#222';ctx.font='800 34px system-ui';ctx.textAlign='center';ctx.fillText('EV KURALLARI',0,-140);
+  [['1. Banyo benim',0],['2. Herkes kendi bulaşığını yıkar',0],['3. Eve misafir YOK',1]].forEach((r,i)=>{const yy=-80+i*90;if(r[1])rr(-150,yy-34,300,52,6,'#ffd93b');ctx.fillStyle='#222';ctx.font='700 22px system-ui';ctx.fillText(r[0],0,yy)});ctx.restore()}}
+
+function frame(time){
+ let acc=0,i=0;for(;i<scenes.length;i++){const d=+scenes[i].d||1;if(time<acc+d||i===scenes.length-1)break;acc+=d}
+ const sc=scenes[i];if(!sc){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);return}
+ const lt=Math.max(0,time-acc),g=ctx.createLinearGradient(0,0,0,H);const c=TH[sc.bg]||TH.day;g.addColorStop(0,c[0]);g.addColorStop(1,c[1]);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(0,H*.8,W,H*.2);
+ if(sc.c!=='none')person(sc.c,W/2-30,H*.8+10,5,lt);
+ prop(sc.p,W/2-30,H*.8+10,lt);
+ ctx.textAlign='center';ctx.textBaseline='alphabetic';
+ rr(W/2-190,36,380,48,24,'#2f9e6a','#fff');ctx.fillStyle='#fff';ctx.font='800 22px system-ui';ctx.fillText(label,W/2,68);
+ const k=Math.min(1,lt/.25),e=1-Math.pow(1-k,3),sca=.6+.4*e;
+ ctx.save();ctx.translate(W/2,180);ctx.scale(sca,sca);ctx.globalAlpha=e;ctx.font='900 58px system-ui';
+ wrap(sc.t||'',W-60).forEach((ln,j)=>outline(ln.join(' '),0,j*66,'#ffd93b',10));ctx.restore();
+ ctx.font='800 40px system-ui';const hs=new Set((sc.h||'').split(' ').map(norm).filter(Boolean)),lines=wrap(sc.s||'',W-70);
+ ctx.globalAlpha=Math.min(1,lt/.2);
+ lines.forEach((ln,j)=>{const sp=ctx.measureText(' ').width,ws=ln.map(w=>ctx.measureText(w).width),tw=ws.reduce((a,b)=>a+b,0)+sp*(ln.length-1);let x=W/2-tw/2;ctx.textAlign='left';
+  ln.forEach((w,q)=>{outline(w,x,H-120-(lines.length-1-j)*50,hs.has(norm(w))?'#ffd93b':'#fff',9);x+=ws[q]+sp})});
+ ctx.globalAlpha=1;ctx.textAlign='center'}
+
+function show(t){now=t;frame(t);const T=total();document.getElementById('seek').value=T?t/T*100:0}
+function play(done){if(playing)return;playing=true;const T=total(),t0=performance.now()-(now>=T-.05?0:now*1000);
+ (function step(n){const t=(n-t0)/1000;if(t>=T){show(T-.01);playing=false;document.getElementById('play').textContent='▶ Oynat';done&&done();return}
+  show(t);if(playing)requestAnimationFrame(step)})(performance.now());
+ document.getElementById('play').textContent='⏸ Durdur'}
+document.getElementById('play').onclick=()=>{if(playing){playing=false;document.getElementById('play').textContent='▶ Oynat'}else play()};
+document.getElementById('seek').oninput=e=>{playing=false;show(e.target.value/100*total())};
+document.getElementById('lab').oninput=e=>{label=e.target.value;show(now)};
+document.getElementById('add').onclick=()=>{scenes.push({t:'YENİ SAHNE',s:'Altyazı buraya.',h:'buraya',bg:'day',c:'girl',p:'none',d:3});build()};
+
+document.getElementById('rec').onclick=()=>{
+ if(typeof MediaRecorder==='undefined'){alert('Bu tarayıcı kaydı desteklemiyor.');return}
+ playing=false;now=0;const st=cv.captureStream(30),mt=['video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+ const mr=new MediaRecorder(st,mt?{mimeType:mt,videoBitsPerSecond:5e6}:{}),ch=[];
+ mr.ondataavailable=e=>e.data.size&&ch.push(e.data);
+ mr.onstop=()=>{const url=URL.createObjectURL(new Blob(ch,{type:'video/webm'})),o=document.getElementById('out');o.textContent='';
+  const v=document.createElement('video');v.src=url;v.controls=true;v.playsInline=true;o.appendChild(v);
+  const a=document.createElement('a');a.href=url;a.download='video.webm';a.textContent='⬇ Videoyu indir';a.style.cssText='display:block;text-align:center;margin-bottom:8px';o.appendChild(a)};
+ mr.start();play(()=>setTimeout(()=>mr.stop(),300))};
+
+function opt(sel,pairs,val){pairs.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;if(v===val)o.selected=true;sel.appendChild(o)})}
+function field(parent,lab,el,cls){const d=document.createElement('div');if(cls)d.className=cls;const l=document.createElement('label');l.textContent=lab;d.append(l,el);parent.appendChild(d)}
+function build(){const L=document.getElementById('list');L.textContent='';
+ scenes.forEach((sc,i)=>{const b=document.createElement('div');b.className='sc';
+  const hd=document.createElement('div');hd.className='hd';const tt=document.createElement('span');tt.textContent='Sahne '+(i+1);
+  const del=document.createElement('button');del.className='g';del.textContent='Sil';del.onclick=()=>{scenes.splice(i,1);build();show(Math.min(now,total()))};hd.append(tt,del);b.appendChild(hd);
+  const mk=(key,type)=>{const e=document.createElement('input');e.type=type||'text';e.value=sc[key];e.oninput=()=>{sc[key]=type==='number'?(+e.value||1):e.value;playing=false;let a=0;for(let j=0;j<i;j++)a+=+scenes[j].d||1;show(a+.6)};return e};
+  const sel=(key,pairs)=>{const s=document.createElement('select');opt(s,pairs,sc[key]);s.onchange=()=>{sc[key]=s.value;playing=false;let a=0;for(let j=0;j<i;j++)a+=+scenes[j].d||1;show(a+.6)};return s};
+  field(b,'Büyük başlık',mk('t'),'w');field(b,'Altyazı',mk('s'),'w');field(b,'Vurgulanacak kelime (sarı)',mk('h'),'w');
+  field(b,'Arka plan',sel('bg',[['day','Gündüz'],['night','Gece'],['dark','Karanlık']]));
+  field(b,'Karakter',sel('c',[['girl','Kız (yeşil ceket)'],['pajama','Pijamalı'],['orange','Turuncu sweatli'],['none','Yok']]));
+  field(b,'Eşya',sel('p',[['none','Yok'],['suitcase','Valiz'],['phone','Telefon'],['note','Kurallar kağıdı']]));
+  field(b,'Süre (sn)',mk('d','number'));L.appendChild(b)})}
+build();show(.6);
+</script>
+</body>
+</html>
